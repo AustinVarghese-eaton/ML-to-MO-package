@@ -1,0 +1,16 @@
+dataset: data.csv
+sheet: null
+package_name: IGBTSurrogate
+inputs: [Vge, Ic, Tj]
+outputs: [Vce, Eon]
+connectors:
+  inputs: {}
+  outputs: {}
+training:
+  epochs: 300
+  batch_size: 32
+  learning_rate: 0.001
+  patience: 20
+tolerance:
+  rtol: 1.0e-4
+  atol: 1.0e-6

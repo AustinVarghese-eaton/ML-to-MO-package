@@ -1,0 +1,137 @@
+name: build-surrogates
+
+on:
+  push:
+    paths:
+      - "datasets/**"
+      - "src/**"
+      - "scripts/**"
+      - ".github/workflows/build-surrogates.yml"
+  workflow_dispatch:
+    inputs:
+      config:
+        description: "Path to a single dataset config.yaml to build (optional)"
+        required: false
+        default: ""
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+      any: ${{ steps.set.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine configs to build
+        id: set
+        shell: bash
+        run: |
+          set -euo pipefail
+          manual='${{ github.event.inputs.config }}'
+          if [ -n "$manual" ]; then
+            configs="$manual"
+          else
+            base='${{ github.event.before }}'
+            if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              base=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+            fi
+            if [ -z "$base" ]; then
+              changed=$(git ls-files 'datasets/**' 'src/**' 'scripts/**')
+            else
+              changed=$(git diff --name-only "$base" HEAD)
+            fi
+            # If generator code changed, rebuild every dataset config.
+            if echo "$changed" | grep -qE '^(src/|scripts/|\.github/)'; then
+              configs=$(git ls-files 'datasets/**/config.yaml')
+            else
+              configs=$(echo "$changed" \
+                | grep -E '^datasets/.+' \
+                | sed -E 's#(datasets/[^/]+)/.*#\1/config.yaml#' \
+                | sort -u \
+                | while read -r c; do [ -f "$c" ] && echo "$c"; done)
+            fi
+          fi
+          python3 - "$configs" <<'PY' > matrix.json
+          import json, sys
+          items = [c for c in sys.argv[1].split() if c.strip()]
+          print(json.dumps({"config": items}))
+          PY
+          matrix=$(cat matrix.json)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          count=$(python3 -c "import json;print(len(json.load(open('matrix.json'))['config']))")
+          [ "$count" -gt 0 ] && echo "any=true" >> "$GITHUB_OUTPUT" || echo "any=false" >> "$GITHUB_OUTPUT"
+          echo "Configs to build: $matrix"
+
+  build:
+    needs: detect
+    if: needs.detect.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install tensorflow || echo "TensorFlow unavailable; sklearn fallback will be used."
+
+      - name: Build surrogate package
+        run: |
+          python -m surrogategen build "${{ matrix.config }}" --out out
+
+      - name: Derive artifact name
+        id: name
+        shell: bash
+        run: |
+          pkg=$(basename "$(dirname "${{ matrix.config }}")")
+          echo "pkg=$pkg" >> "$GITHUB_OUTPUT"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: surrogate-${{ steps.name.outputs.pkg }}
+          path: out
+          if-no-files-found: error
+
+  validate:
+    needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: openmodelica/openmodelica:v1.24.0-minimal
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python + OMPython
+        run: |
+          apt-get update
+          apt-get install -y python3-pip
+          pip3 install --break-system-packages OMPython numpy || pip3 install OMPython numpy
+
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Validate each package in OpenModelica
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          status=0
+          for pred in artifacts/**/*.predictions.json; do
+            dir=$(dirname "$pred")
+            echo "::group::Validating $pred"
+            python3 scripts/om_validate.py "$dir" "$pred" || status=1
+            echo "::endgroup::"
+          done
+          exit $status

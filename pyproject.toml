@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "surrogategen"
+version = "0.1.0"
+description = "Convert tabular datasets into Modelica 4.0.0 neural-network surrogate packages."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scikit-learn>=1.3",
+    "openpyxl>=3.1",
+    "pydantic>=2.5",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+tf = ["tensorflow>=2.13"]
+dev = ["pytest>=7.4"]
+om = ["OMPython>=3.5"]
+
+[project.scripts]
+surrogategen = "surrogategen.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+surrogategen = ["export/static_layers/*.mo"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
