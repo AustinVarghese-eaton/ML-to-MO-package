@@ -1,0 +1,16 @@
+dataset: IGBT.xlsx
+sheet: Sheet1
+package_name: IGBTSurrogate
+inputs: [Current_A, Fsw_kHz, Tc_C, F0_Hz]
+outputs: [P_loss_W, Tj_C, IGBT_Tj_peak_C, Diode_Tj_peak_C]
+connectors:
+  inputs: {}
+  outputs: {}
+training:
+  epochs: 300
+  batch_size: 32
+  learning_rate: 0.001
+  patience: 20
+tolerance:
+  rtol: 1.0e-4
+  atol: 1.0e-6
