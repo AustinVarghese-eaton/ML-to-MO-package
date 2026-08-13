@@ -1,0 +1,16 @@
+dataset: hex_dataset.xlsx.csv
+sheet: sheet1
+package_name: HexSurrogate
+inputs: [time, T_h_in, T_c_in, m_dot_h, m_dot_c, P, Q]
+outputs: [T_h_out, T_c_out, eff]
+connectors:
+  inputs: {}
+  outputs: {}
+training:
+  epochs: 300
+  batch_size: 32
+  learning_rate: 0.001
+  patience: 20
+tolerance:
+  rtol: 1.0e-4
+  atol: 1.0e-6
