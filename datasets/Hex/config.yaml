@@ -1,4 +1,4 @@
-dataset: hex_dataset.xlsx.csv
+dataset: hex_dataset.xlsx
 sheet: sheet1
 package_name: HexSurrogate
 inputs: [time, T_h_in, T_c_in, m_dot_h, m_dot_c, P, Q]
