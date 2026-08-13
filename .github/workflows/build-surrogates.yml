@@ -111,10 +111,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Python + OMPython
+      - name: Install Python + OMPython + Modelica library
         run: |
           apt-get update
-          apt-get install -y python3-pip
+          # omlibrary provides the Modelica Standard Library, which the -minimal
+          # OpenModelica image does not ship. OMC auto-installs it into the user's
+          # ~/.openmodelica/libraries on the first loadModel(Modelica) call.
+          apt-get install -y python3-pip omlibrary
           pip3 install --break-system-packages OMPython numpy || pip3 install OMPython numpy
 
       - name: Create non-root user for OMC

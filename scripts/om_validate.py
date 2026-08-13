@@ -78,7 +78,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[om] package={pkg} file={pkg_mo}")
 
     omc = _load_omc()
-    omc.sendExpression('loadModel(Modelica)')
+    if not omc.sendExpression('loadModel(Modelica, {"4.0.0"})'):
+        print(f"[om] loadModel(Modelica) failed: {omc.sendExpression('getErrorString()')}", file=sys.stderr)
+        return 1
     if not omc.sendExpression(f'loadFile("{pkg_mo.as_posix()}")'):
         print(f"[om] loadFile failed: {omc.sendExpression('getErrorString()')}", file=sys.stderr)
         return 1
