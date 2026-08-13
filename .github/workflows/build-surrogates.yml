@@ -117,6 +117,14 @@ jobs:
           apt-get install -y python3-pip
           pip3 install --break-system-packages OMPython numpy || pip3 install OMPython numpy
 
+      - name: Create non-root user for OMC
+        shell: bash
+        run: |
+          set -euo pipefail
+          # OpenModelica's OMC server refuses to start as root, so run validation
+          # as a dedicated non-root user with a writable HOME.
+          useradd -m -s /bin/bash omuser
+
       - name: Download built packages
         uses: actions/download-artifact@v4
         with:
@@ -126,12 +134,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s globstar nullglob
-          status=0
-          for pred in artifacts/**/*.predictions.json; do
-            dir=$(dirname "$pred")
-            echo "::group::Validating $pred"
-            python3 scripts/om_validate.py "$dir" "$pred" || status=1
-            echo "::endgroup::"
-          done
-          exit $status
+          # Grant the non-root user access to the checkout and downloaded artifacts.
+          chown -R omuser "$GITHUB_WORKSPACE"
+          # Run the validation loop as omuser; OMC needs a writable HOME for its
+          # temp/log/ZMQ-port files.
+          su omuser -c '
+            set -euo pipefail
+            export HOME=/home/omuser
+            shopt -s globstar nullglob
+            status=0
+            for pred in artifacts/**/*.predictions.json; do
+              dir=$(dirname "$pred")
+              echo "::group::Validating $pred"
+              python3 scripts/om_validate.py "$dir" "$pred" || status=1
+              echo "::endgroup::"
+            done
+            exit $status
+          '
