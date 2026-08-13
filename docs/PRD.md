@@ -25,7 +25,7 @@ YAML config, and the manual self-check becomes automated code.
 ## 4. Requirements
 
 ### Functional
-- **FR1** Config-driven: one YAML per dataset (dataset path, sheet, inputs, outputs, package
+- **FR1** Config-driven: one YAML per dataset (dataset path, inputs, outputs, package
   name, optional connector overrides, optional training params).
 - **FR2** Data prep matches prompt STEP 2-A exactly (dedupe, numeric coerce, dropna, 70/15/15
   split `random_state=42`, StandardScaler on train X/Y, `u_test` = median input row).
@@ -48,7 +48,6 @@ YAML config, and the manual self-check becomes automated code.
 ## 5. Config schema (example)
 ```yaml
 dataset: data.csv          # path relative to the config file
-sheet: null                # xlsx sheet name or null
 package_name: IGBTSurrogate
 inputs: [Vge, Ic, Tj]
 outputs: [Vce, Eon]

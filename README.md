@@ -45,7 +45,6 @@ Outputs in `out/`:
 
 ```yaml
 dataset: data.csv          # path relative to this config file
-sheet: null                # xlsx sheet name, or null for CSV / first sheet
 package_name: IGBTSurrogate
 inputs: [Vge, Ic, Tj]
 outputs: [Vce, Eon]

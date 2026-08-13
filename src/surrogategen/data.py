@@ -49,8 +49,7 @@ def _load_frame(cfg: SurrogateConfig) -> pd.DataFrame:
         raise FileNotFoundError(f"Dataset not found: {path}")
     suffix = path.suffix.lower()
     if suffix in {".xlsx", ".xls"}:
-        sheet = cfg.sheet if cfg.sheet is not None else 0
-        return pd.read_excel(path, sheet_name=sheet)
+        return pd.read_excel(path, sheet_name=0)
     if suffix == ".csv":
         return pd.read_csv(path)
     raise ValueError(f"Unsupported dataset type '{suffix}': {path}")

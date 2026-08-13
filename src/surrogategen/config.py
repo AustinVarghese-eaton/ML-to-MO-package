@@ -53,7 +53,6 @@ class SurrogateConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     dataset: str
-    sheet: Optional[str] = None
     package_name: str
     inputs: list[str] = Field(min_length=1)
     outputs: list[str] = Field(min_length=1)

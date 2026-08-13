@@ -51,7 +51,6 @@ datasets/<your_name>/config.yaml
 
 ```yaml
 dataset: data.csv          # file name, relative to this config file
-sheet: null                # for .xlsx put the sheet name (e.g. Sheet1); null for CSV
 package_name: MySurrogate  # must match ^[A-Za-z][A-Za-z0-9_]*$ (letter, then letters/digits/_)
 inputs:  [colA, colB, colC]   # exact dataset column headers
 outputs: [colX, colY]         # exact dataset column headers (no overlap with inputs)
@@ -70,7 +69,7 @@ tolerance:                 # parity tolerance used by OpenModelica validation
 
 Notes:
 - `dataset` must match the **actual file name** (including `.xlsx` vs `.csv`).
-- For Excel, set `sheet` to the sheet that holds the data.
+- For Excel, the **first sheet** is used automatically; keep your cleaned data on the first sheet.
 - Only add a `connectors` override if a column name is **not** a valid Modelica identifier
   (e.g. starts with a digit or contains a space). Example: `inputs: {"1x": current}`.
 
@@ -138,7 +137,6 @@ GitHub → **Actions** → `build-surrogates` → **Run workflow** (manual dispa
 | Field | Required | Description |
 |-------|----------|-------------|
 | `dataset` | yes | Data file name, relative to the config file. |
-| `sheet` | no | Excel sheet name; `null` for CSV or first sheet. |
 | `package_name` | yes | Modelica package name; `^[A-Za-z][A-Za-z0-9_]*$`. |
 | `inputs` | yes | List of input column headers (network inputs). |
 | `outputs` | yes | List of output column headers (network outputs). |

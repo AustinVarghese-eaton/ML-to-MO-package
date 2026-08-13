@@ -39,7 +39,7 @@ overlap, `package_name` & connector names match `^[A-Za-z][A-Za-z0-9_]*$`, defau
 **Accept:** `test_config.py` — valid config loads; bad identifier / overlapping columns raise clear errors.
 
 ### F2. Data pipeline  `[x]`
-File: `data.py`. Port prompt STEP 2-A exactly. Load csv/xlsx (sheet), keep confirmed cols, verify exist,
+File: `data.py`. Port prompt STEP 2-A exactly. Load csv/xlsx (first sheet), keep confirmed cols, verify exist,
 dedupe, coerce numeric, dropna, print counts, split 70/15/15 `rs=42`, fit StandardScaler on train X&Y,
 transform all; return scalers as lists + `u_test` (median of input cols, original units) + sample rows.
 **Accept:** on example dataset prints row/split counts; returns scaler lists of right lengths; `u_test` len = n_in.

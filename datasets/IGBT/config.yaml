@@ -1,5 +1,4 @@
 dataset: IGBT.xlsx
-sheet: Sheet1
 package_name: IGBTSurrogate
 inputs: [Current_A, Fsw_kHz, Tc_C, F0_Hz]
 outputs: [P_loss_W, Tj_C, IGBT_Tj_peak_C, Diode_Tj_peak_C]

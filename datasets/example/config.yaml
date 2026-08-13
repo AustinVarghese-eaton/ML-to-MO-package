@@ -1,5 +1,4 @@
 dataset: data.csv
-sheet: null
 package_name: IGBTSurrogate
 inputs: [Vge, Ic, Tj]
 outputs: [Vce, Eon]

@@ -25,7 +25,6 @@ RULES
 1. Use a confirmation-based workflow, not manual form-fill.
 2. Do not ask the user to manually type all columns if they can be discovered from the uploaded file.
 3. Before running training/export code, inspect the uploaded dataset read-only and ask the user to confirm:
-   - sheet name if XLSX
    - input columns
    - output columns
    - Modelica package name
@@ -42,13 +41,12 @@ STEP 1 — DISCOVER + CONFIRM
 ============================================================
 When a dataset is uploaded:
 - Inspect the file.
-- If XLSX, list available sheets and show the first-sheet default.
+- If XLSX, read the first sheet (the only supported sheet).
 - Read headers only first.
 - Present a concise confirmation prompt with:
   - detected file type
-  - available sheet names if XLSX
   - detected columns
-  - request to confirm: sheet, inputs, outputs, package name
+  - request to confirm: inputs, outputs, package name
   - ask whether connector names should remain identical to confirmed columns or be overridden
 - Validate package and connector names with regex ^[A-Za-z][A-Za-z0-9_]*$.
 - If a confirmed connector name is invalid, ask for a corrected name before running code.
