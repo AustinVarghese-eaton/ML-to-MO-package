@@ -1,0 +1,15 @@
+dataset: DOE-SMB-Time.csv
+package_name: DOE_TIme_Surrogate
+inputs: [P3_DS_Arm_Mag_L, P4_DS_Arm_W, P6_DS_Arm_Th, P9_DS_Mag_H, P11_DS_Mag_W, P18_DS_Core_Gap, P19_DS_Core_R, P22_DS_Bobbin_Th, P23_DS_Coil_Th, P273_Arm_L, P69_DS_No_Turns, P60_DS_Core_Len, P61_DS_Wire_dia_mm, P62_DS_N_Len, P63_DS_N_Th, P66_DS_Capacitance, P67_DS_VCap, P190_Time_Ipeak]
+outputs: [P191_Vcap_max, P192_Vcap_min, P193_E_per_Farad, P194_Time_1mm, P195_Time_Parting, P350_Time_1mm_Final, P351_Time_Parting_Final]
+connectors:
+  inputs: {}
+  outputs: {}
+training:
+  epochs: 300
+  batch_size: 32
+  learning_rate: 0.001
+  patience: 20
+tolerance:
+  rtol: 1.0e-4
+  atol: 1.0e-6
