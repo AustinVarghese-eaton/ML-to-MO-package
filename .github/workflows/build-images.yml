@@ -1,0 +1,63 @@
+name: build-images
+
+# Builds the two prebuilt CI images and pushes them to GitHub Container Registry
+# (GHCR). Runs only when the dependency set or the Dockerfiles change -- NOT on
+# every dataset build -- so the slow TensorFlow/OpenModelica installs happen once
+# and are reused by build-surrogates.yml.
+
+on:
+  push:
+    paths:
+      - "docker/**"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - ".github/workflows/build-images.yml"
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: builder
+            dockerfile: docker/builder.Dockerfile
+          - name: validate
+            dockerfile: docker/validate.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image name (lowercase)
+        id: img
+        shell: bash
+        run: |
+          repo=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=${{ env.REGISTRY }}/${repo}/${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.img.outputs.image }}:latest
+            ${{ steps.img.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

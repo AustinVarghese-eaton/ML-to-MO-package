@@ -14,6 +14,10 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   detect:
     runs-on: ubuntu-latest
@@ -69,21 +73,21 @@ jobs:
     needs: detect
     if: needs.detect.outputs.any == 'true'
     runs-on: ubuntu-latest
+    # Prebuilt image with numpy/pandas/sklearn/TensorFlow already installed
+    # (see .github/workflows/build-images.yml). GHCR paths must be lowercase.
+    container:
+      image: ghcr.io/austinvarghese-eaton/ml-to-mo-package/builder:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install tensorflow || echo "TensorFlow unavailable; sklearn fallback will be used."
+      - name: Install package (deps already baked into the image)
+        run: pip install --no-deps -e .
 
       - name: Build surrogate package
         run: |
@@ -106,19 +110,15 @@ jobs:
   validate:
     needs: build
     runs-on: ubuntu-latest
+    # Prebuilt image = OpenModelica minimal + omlibrary + OMPython/numpy already
+    # installed (see .github/workflows/build-images.yml). GHCR paths must be lowercase.
     container:
-      image: openmodelica/openmodelica:v1.24.0-minimal
+      image: ghcr.io/austinvarghese-eaton/ml-to-mo-package/validate:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Python + OMPython + Modelica library
-        run: |
-          apt-get update
-          # omlibrary provides the Modelica Standard Library, which the -minimal
-          # OpenModelica image does not ship. OMC auto-installs it into the user's
-          # ~/.openmodelica/libraries on the first loadModel(Modelica) call.
-          apt-get install -y python3-pip omlibrary
-          pip3 install --break-system-packages OMPython numpy || pip3 install OMPython numpy
 
       - name: Create non-root user for OMC
         shell: bash
