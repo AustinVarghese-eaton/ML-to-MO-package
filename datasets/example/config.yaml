@@ -6,10 +6,11 @@ connectors:
   inputs: {}
   outputs: {}
 training:
-  epochs: 300
+  epochs: 500
   batch_size: 32
   learning_rate: 0.001
-  patience: 20
+  patience: 40
+  # hidden_layers: [128, 128, 64]  # optional: override network size per dataset
 tolerance:
   rtol: 1.0e-4
   atol: 1.0e-6

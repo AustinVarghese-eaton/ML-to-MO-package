@@ -45,10 +45,10 @@ def test_within_and_dims(bundle):
     assert files["Pkg/Layers/dense.mo"].startswith("within Pkg.Layers;")
     assert files["Pkg/Networks/SurrogateMLP.mo"].startswith("within Pkg.Networks;")
     mlp = files["Pkg/Networks/SurrogateMLP.mo"]
-    assert f"W1[128, {bundle.n_in}]" in mlp
-    assert "W2[128, 128]" in mlp
-    assert "W3[64, 128]" in mlp
-    assert f"W4[{bundle.n_out}, 64]" in mlp
+    # Verify all layer weight matrices are present with correct dimensions (dynamic check)
+    for i, (W, _b) in enumerate(bundle.layers, start=1):
+        rows, cols = len(W), len(W[0])
+        assert f"W{i}[{rows}, {cols}]" in mlp
 
 
 def test_selfcheck_passes(bundle):

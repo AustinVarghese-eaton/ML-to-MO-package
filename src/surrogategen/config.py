@@ -30,10 +30,20 @@ class ConnectorOverrides(BaseModel):
 class TrainingParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    epochs: int = 300
+    epochs: int = 500
     batch_size: int = 32
     learning_rate: float = 0.001
-    patience: int = 20
+    patience: int = 40
+    hidden_layers: list[int] = Field(default_factory=lambda: [128, 128, 64])
+
+    @field_validator("hidden_layers")
+    @classmethod
+    def _valid_hidden_layers(cls, v: list[int]) -> list[int]:
+        if not v:
+            raise ValueError("hidden_layers must have at least one layer.")
+        if any(n <= 0 for n in v):
+            raise ValueError("All hidden_layers sizes must be positive integers.")
+        return v
 
 
 class Tolerance(BaseModel):

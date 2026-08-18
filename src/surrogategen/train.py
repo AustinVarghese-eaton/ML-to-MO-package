@@ -15,7 +15,7 @@ from surrogategen.config import TrainingParams
 from surrogategen.data import PreparedData
 
 SEED = 42
-HIDDEN = (128, 128, 64)  # architecture per spec: Dense(128,128,64) -> Dense(n_out, linear)
+HIDDEN = (128, 128, 64)  # default architecture; overridden by params.hidden_layers
 
 
 @dataclass
@@ -91,9 +91,10 @@ def _train_tensorflow(data: PreparedData, params: TrainingParams) -> WeightBundl
     np.random.seed(SEED)
     tf.random.set_seed(SEED)
 
+    hidden = tuple(params.hidden_layers)
     model = tf.keras.Sequential(
         [tf.keras.layers.Input(shape=(data.n_in,))]
-        + [tf.keras.layers.Dense(u, activation="relu") for u in HIDDEN]
+        + [tf.keras.layers.Dense(u, activation="relu") for u in hidden]
         + [tf.keras.layers.Dense(data.n_out, activation="linear")]
     )
     model.compile(
@@ -103,13 +104,16 @@ def _train_tensorflow(data: PreparedData, params: TrainingParams) -> WeightBundl
     early = tf.keras.callbacks.EarlyStopping(
         monitor="val_loss", patience=params.patience, restore_best_weights=True
     )
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
+        monitor="val_loss", factor=0.5, patience=10, min_lr=1e-6, verbose=0
+    )
     history = model.fit(
         data.X_train,
         data.Y_train,
         validation_data=(data.X_val, data.Y_val),
         batch_size=params.batch_size,
         epochs=params.epochs,
-        callbacks=[early],
+        callbacks=[early, reduce_lr],
         verbose=0,
     )
 
@@ -145,13 +149,14 @@ def _train_sklearn(data: PreparedData, params: TrainingParams) -> WeightBundle:
     from sklearn.neural_network import MLPRegressor
 
     model = MLPRegressor(
-        hidden_layer_sizes=HIDDEN,
+        hidden_layer_sizes=tuple(params.hidden_layers),
         activation="relu",
         solver="adam",
         learning_rate_init=params.learning_rate,
         batch_size=min(params.batch_size, len(data.X_train)),
         max_iter=params.epochs,
         early_stopping=True,
+        validation_fraction=0.15,
         n_iter_no_change=params.patience,
         random_state=SEED,
     )

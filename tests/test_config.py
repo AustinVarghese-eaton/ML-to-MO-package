@@ -83,3 +83,65 @@ def test_invalid_connector_name(tmp_path):
     )
     with pytest.raises(ValueError):
         config_mod.load(p)
+
+
+def test_hidden_layers_default(tmp_path):
+    p = _write(
+        tmp_path,
+        """
+        dataset: data.csv
+        package_name: Pkg
+        inputs: [a]
+        outputs: [b]
+        """,
+    )
+    cfg = config_mod.load(p)
+    assert cfg.training.hidden_layers == [128, 128, 64]
+
+
+def test_hidden_layers_custom(tmp_path):
+    p = _write(
+        tmp_path,
+        """
+        dataset: data.csv
+        package_name: Pkg
+        inputs: [a]
+        outputs: [b]
+        training:
+          hidden_layers: [64, 32]
+        """,
+    )
+    cfg = config_mod.load(p)
+    assert cfg.training.hidden_layers == [64, 32]
+
+
+def test_hidden_layers_empty_rejected(tmp_path):
+    p = _write(
+        tmp_path,
+        """
+        dataset: data.csv
+        package_name: Pkg
+        inputs: [a]
+        outputs: [b]
+        training:
+          hidden_layers: []
+        """,
+    )
+    with pytest.raises(ValueError):
+        config_mod.load(p)
+
+
+def test_hidden_layers_zero_rejected(tmp_path):
+    p = _write(
+        tmp_path,
+        """
+        dataset: data.csv
+        package_name: Pkg
+        inputs: [a]
+        outputs: [b]
+        training:
+          hidden_layers: [64, 0, 32]
+        """,
+    )
+    with pytest.raises(ValueError):
+        config_mod.load(p)
