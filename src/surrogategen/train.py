@@ -15,7 +15,7 @@ from surrogategen.config import TrainingParams
 from surrogategen.data import PreparedData
 
 SEED = 42
-HIDDEN = (128, 128, 64)  # architecture per spec: Dense(128,128,64) -> Dense(n_out, linear)
+HIDDEN = (128, 128, 64)  # default architecture; overridden by params.hidden_layers
 
 
 @dataclass
@@ -32,6 +32,7 @@ class WeightBundle:
     backend: str
     epochs_run: int
     final_val_loss: float
+    y_log_mask: list[bool] | None = None  # per-output: expm1 applied on True entries
 
     @property
     def n_in(self) -> int:
@@ -61,6 +62,10 @@ class WeightBundle:
             if idx < n_layers - 1:  # relu on hidden layers, linear on output
                 h = np.maximum(h, 0.0)
         y = h * np.asarray(self.y_scale) + np.asarray(self.y_mean)
+        if self.y_log_mask is not None and any(self.y_log_mask):
+            mask = np.asarray(self.y_log_mask, dtype=bool)
+            y = y.copy()
+            y[:, mask] = np.expm1(y[:, mask])
         return y
 
 
@@ -91,10 +96,15 @@ def _train_tensorflow(data: PreparedData, params: TrainingParams) -> WeightBundl
     np.random.seed(SEED)
     tf.random.set_seed(SEED)
 
+    hidden = tuple(params.hidden_layers)
+    reg = tf.keras.regularizers.l2(params.l2) if params.l2 > 0 else None
     model = tf.keras.Sequential(
         [tf.keras.layers.Input(shape=(data.n_in,))]
-        + [tf.keras.layers.Dense(u, activation="relu") for u in HIDDEN]
-        + [tf.keras.layers.Dense(data.n_out, activation="linear")]
+        + [
+            tf.keras.layers.Dense(u, activation="relu", kernel_regularizer=reg)
+            for u in hidden
+        ]
+        + [tf.keras.layers.Dense(data.n_out, activation="linear", kernel_regularizer=reg)]
     )
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=params.learning_rate),
@@ -103,13 +113,17 @@ def _train_tensorflow(data: PreparedData, params: TrainingParams) -> WeightBundl
     early = tf.keras.callbacks.EarlyStopping(
         monitor="val_loss", patience=params.patience, restore_best_weights=True
     )
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
+        monitor="val_loss", factor=0.5, patience=10, min_lr=1e-6, verbose=0
+    )
+    batch_size = min(params.batch_size, max(1, len(data.X_train) // 10))
     history = model.fit(
         data.X_train,
         data.Y_train,
         validation_data=(data.X_val, data.Y_val),
-        batch_size=params.batch_size,
+        batch_size=batch_size,
         epochs=params.epochs,
-        callbacks=[early],
+        callbacks=[early, reduce_lr],
         verbose=0,
     )
 
@@ -138,6 +152,7 @@ def _train_tensorflow(data: PreparedData, params: TrainingParams) -> WeightBundl
         backend="tensorflow",
         epochs_run=epochs_run,
         final_val_loss=final_val_loss,
+        y_log_mask=data.y_log_mask,
     )
 
 
@@ -145,13 +160,15 @@ def _train_sklearn(data: PreparedData, params: TrainingParams) -> WeightBundle:
     from sklearn.neural_network import MLPRegressor
 
     model = MLPRegressor(
-        hidden_layer_sizes=HIDDEN,
+        hidden_layer_sizes=tuple(params.hidden_layers),
         activation="relu",
         solver="adam",
+        alpha=params.l2,
         learning_rate_init=params.learning_rate,
-        batch_size=min(params.batch_size, len(data.X_train)),
+        batch_size=min(params.batch_size, max(1, len(data.X_train) // 10)),
         max_iter=params.epochs,
         early_stopping=True,
+        validation_fraction=0.15,
         n_iter_no_change=params.patience,
         random_state=SEED,
     )
@@ -180,6 +197,7 @@ def _train_sklearn(data: PreparedData, params: TrainingParams) -> WeightBundle:
         backend="sklearn",
         epochs_run=epochs_run,
         final_val_loss=final_val_loss,
+        y_log_mask=data.y_log_mask,
     )
 
 

@@ -15,6 +15,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
     # Imported lazily so ``--help`` works without heavy deps installed.
     from surrogategen import config as config_mod
     from surrogategen import data as data_mod
+    from surrogategen import metrics as metrics_mod
     from surrogategen import packager, selfcheck
     from surrogategen import train as train_mod
     from surrogategen.export import templates
@@ -54,6 +55,16 @@ def _cmd_build(args: argparse.Namespace) -> int:
     pred_path = out_dir / f"{cfg.package_name}.predictions.json"
     pred_path.write_text(json.dumps(predictions, indent=2), encoding="utf-8")
     print(f"[build] wrote parity  -> {pred_path}")
+
+    y_pred = bundle.predict(prepared.X_test_raw)
+    report = metrics_mod.compute_metrics(
+        prepared.Y_test_raw, y_pred, bundle.output_columns
+    )
+    print("[build] test-set accuracy (original units):")
+    print(metrics_mod.format_report(report))
+    metrics_path = out_dir / f"{cfg.package_name}.metrics.json"
+    metrics_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(f"[build] wrote metrics -> {metrics_path}")
 
     return 0
 

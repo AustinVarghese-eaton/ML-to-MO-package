@@ -18,7 +18,7 @@ from importlib import resources
 from surrogategen.export.formatting import fmt_mat, fmt_vec
 from surrogategen.train import WeightBundle
 
-LAYER_FILES = ["dense", "relu", "identity", "affine_scale", "affine_unscale"]
+LAYER_FILES = ["dense", "relu", "identity", "affine_scale", "affine_unscale", "exp_mask"]
 
 
 def _static_layer(name: str, pkg: str) -> str:
@@ -59,7 +59,7 @@ def _mapping_comment(prefix: str, names: list[str]) -> str:
 def _surrogate_mlp(pkg: str, bundle: WeightBundle) -> str:
     n_in = bundle.n_in
     n_out = bundle.n_out
-    (W1, b1), (W2, b2), (W3, b3), (W4, b4) = bundle.layers
+    n_layers = len(bundle.layers)
 
     lines: list[str] = []
     lines.append(f"within {pkg}.Networks;")
@@ -73,26 +73,34 @@ def _surrogate_mlp(pkg: str, bundle: WeightBundle) -> str:
     lines.append(f"  constant Real x_scale[{n_in}] = {fmt_vec(bundle.x_scale)};")
     lines.append(f"  constant Real y_mean[{n_out}] = {fmt_vec(bundle.y_mean)};")
     lines.append(f"  constant Real y_scale[{n_out}] = {fmt_vec(bundle.y_scale)};")
-    lines.append(f"  constant Real W1[128, {n_in}] = {fmt_mat(W1)};")
-    lines.append(f"  constant Real b1[128] = {fmt_vec(b1)};")
-    lines.append(f"  constant Real W2[128, 128] = {fmt_mat(W2)};")
-    lines.append(f"  constant Real b2[128] = {fmt_vec(b2)};")
-    lines.append(f"  constant Real W3[64, 128] = {fmt_mat(W3)};")
-    lines.append(f"  constant Real b3[64] = {fmt_vec(b3)};")
-    lines.append(f"  constant Real W4[{n_out}, 64] = {fmt_mat(W4)};")
-    lines.append(f"  constant Real b4[{n_out}] = {fmt_vec(b4)};")
+    log_mask = bundle.y_log_mask or [False] * n_out
+    use_log = any(log_mask)
+    if use_log:
+        mask_vec = [1.0 if m else 0.0 for m in log_mask]
+        lines.append(f"  constant Real y_log_mask[{n_out}] = {fmt_vec(mask_vec)};")
+    for i, (W, b) in enumerate(bundle.layers, start=1):
+        rows = len(W)
+        cols = len(W[0])
+        lines.append(f"  constant Real W{i}[{rows}, {cols}] = {fmt_mat(W)};")
+        lines.append(f"  constant Real b{i}[{rows}] = {fmt_vec(b)};")
     lines.append(f"  Real x_s[{n_in}];")
-    lines.append("  Real h1[128];")
-    lines.append("  Real h2[128];")
-    lines.append("  Real h3[64];")
+    for i, (W, _b) in enumerate(bundle.layers[:-1], start=1):
+        lines.append(f"  Real h{i}[{len(W)}];")
     lines.append(f"  Real y_s[{n_out}];")
     lines.append("algorithm")
     lines.append(f"  x_s := {pkg}.Layers.affine_scale(u, x_mean, x_scale);")
-    lines.append(f"  h1 := {pkg}.Layers.relu({pkg}.Layers.dense(x_s, W1, b1));")
-    lines.append(f"  h2 := {pkg}.Layers.relu({pkg}.Layers.dense(h1, W2, b2));")
-    lines.append(f"  h3 := {pkg}.Layers.relu({pkg}.Layers.dense(h2, W3, b3));")
-    lines.append(f"  y_s := {pkg}.Layers.dense(h3, W4, b4);")
-    lines.append(f"  y := {pkg}.Layers.affine_unscale(y_s, y_mean, y_scale);")
+    prev = "x_s"
+    for i, (W, _b) in enumerate(bundle.layers[:-1], start=1):
+        lines.append(f"  h{i} := {pkg}.Layers.relu({pkg}.Layers.dense({prev}, W{i}, b{i}));")
+        prev = f"h{i}"
+    lines.append(f"  y_s := {pkg}.Layers.dense({prev}, W{n_layers}, b{n_layers});")
+    if use_log:
+        lines.append(
+            f"  y := {pkg}.Layers.exp_mask("
+            f"{pkg}.Layers.affine_unscale(y_s, y_mean, y_scale), y_log_mask);"
+        )
+    else:
+        lines.append(f"  y := {pkg}.Layers.affine_unscale(y_s, y_mean, y_scale);")
     lines.append("end SurrogateMLP;")
     return "\n".join(lines) + "\n"
 

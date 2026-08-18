@@ -6,10 +6,13 @@ connectors:
   inputs: {}
   outputs: {}
 training:
-  epochs: 300
+  epochs: 500
   batch_size: 32
   learning_rate: 0.001
-  patience: 20
+  patience: 40
+  # l2: 0.0001                     # optional: L2 weight decay (0 = off) if overfitting
+  # hidden_layers: [128, 128, 64]  # optional: override network size per dataset
+  # log_outputs: [Eon]             # optional: log1p-transform skewed outputs (e.g. energy)
 tolerance:
   rtol: 1.0e-4
   atol: 1.0e-6
