@@ -40,6 +40,7 @@ Outputs in `out/`:
 - `IGBTSurrogate/` — the Modelica package folder
 - `IGBTSurrogate.zip` — the deliverable (single root folder inside)
 - `IGBTSurrogate.predictions.json` — Python predictions used for numeric parity
+- `IGBTSurrogate.metrics.json` — test-set accuracy report (MAE, RMSE, MAPE, R² per output)
 
 ## Config schema
 
@@ -52,10 +53,13 @@ connectors:                # optional; default connector name = column name
   inputs: {Vge: vge}
   outputs: {Vce: vce}
 training:                  # optional overrides
-  epochs: 300
+  epochs: 500              # default 500
   batch_size: 32
   learning_rate: 0.001
-  patience: 20
+  patience: 40             # early-stopping patience (default 40)
+  l2: 0.0                  # L2 regularization weight (default 0; off)
+  hidden_layers: [128, 128, 64]  # hidden unit counts per layer (default [128,128,64])
+  log_outputs: []          # output columns to log1p-transform before training
 tolerance:                 # parity tolerance used by OpenModelica validation
   rtol: 1.0e-4
   atol: 1.0e-6

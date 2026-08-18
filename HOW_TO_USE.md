@@ -16,8 +16,9 @@ From one dataset (CSV/XLSX) + one config file, the tool produces a Modelica 4.0.
 - `Networks.SurrogateBlock` — a **model** with input/output connectors for the diagram canvas.
 - `Examples.RunSurrogate` — a **model** you can simulate immediately with editable test inputs.
 
-Deliverables per build: `<PackageName>.zip`, the expanded `<PackageName>/` folder, and
-`<PackageName>.predictions.json` (used to verify the Modelica outputs match Python).
+Deliverables per build: `<PackageName>.zip`, the expanded `<PackageName>/` folder,
+`<PackageName>.predictions.json` (used to verify the Modelica outputs match Python), and
+`<PackageName>.metrics.json` (test-set accuracy: MAE, RMSE, MAPE, R² per output).
 
 ---
 
@@ -105,6 +106,7 @@ In the completed run's summary page, scroll to **Artifacts** → download
 - `MySurrogate/` — the Modelica package folder
 - `MySurrogate.zip` — the deliverable
 - `MySurrogate.predictions.json` — parity reference
+- `MySurrogate.metrics.json` — test-set accuracy report
 
 ### Step 7 — Use it
 
@@ -142,10 +144,13 @@ GitHub → **Actions** → `build-surrogates` → **Run workflow** (manual dispa
 | `outputs` | yes | List of output column headers (network outputs). |
 | `connectors.inputs` | no | Map `column -> connector name` overrides. |
 | `connectors.outputs` | no | Map `column -> connector name` overrides. |
-| `training.epochs` | no | Max training epochs (default 300). |
+| `training.epochs` | no | Max training epochs (default 500). |
 | `training.batch_size` | no | Batch size (default 32). |
 | `training.learning_rate` | no | Adam learning rate (default 0.001). |
-| `training.patience` | no | Early-stopping patience (default 20). |
+| `training.patience` | no | Early-stopping patience (default 40). |
+| `training.l2` | no | L2 regularisation weight applied to all Dense layers (default 0; off). |
+| `training.hidden_layers` | no | List of hidden unit counts per layer (default `[128, 128, 64]`). |
+| `training.log_outputs` | no | Output columns to log1p-transform before training and invert in export (default `[]`). |
 | `tolerance.rtol` | no | Relative parity tolerance (default 1e-4). |
 | `tolerance.atol` | no | Absolute parity tolerance (default 1e-6). |
 

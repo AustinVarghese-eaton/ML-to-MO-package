@@ -40,17 +40,18 @@ overlap, `package_name` & connector names match `^[A-Za-z][A-Za-z0-9_]*$`, defau
 
 ### F2. Data pipeline  `[x]`
 File: `data.py`. Port prompt STEP 2-A exactly. Load csv/xlsx (first sheet), keep confirmed cols, verify exist,
-dedupe, coerce numeric, dropna, print counts, split 70/15/15 `rs=42`, fit StandardScaler on train X&Y,
+dedupe, coerce numeric, dropna, print counts, split 80/10/10 `rs=42` (two `train_test_split` calls), fit StandardScaler on train X&Y,
 transform all; return scalers as lists + `u_test` (median of input cols, original units) + sample rows.
 **Accept:** on example dataset prints row/split counts; returns scaler lists of right lengths; `u_test` len = n_in.
 
 ### F3. Training + fallback → WeightBundle  `[x]`
-File: `train.py`. Define `WeightBundle {layers:[(W_mo,b)], x_mean,x_scale,y_mean,y_scale,in_names,out_names}`.
-TF path: seeds; `Sequential Dense(128 relu,128 relu,64 relu, n_out linear)`; `Adam(1e-3)` mse; batch=32
-epochs=300 val_data `EarlyStopping(patience=20,restore_best)`. Extract `W.T` + `b` per layer.
-Fallback: on any TF import/train exception → sklearn `MLPRegressor(hidden=(128,128,64),relu,adam,
-max_iter≈epochs)`; extract `coefs_.T` + `intercepts_`. Assert no NaN/Inf. Print `epochs_run`/`final_val_loss`.
-**Accept:** on tiny synthetic data returns 4 layer weight matrices with dims `128xn_in,128x128,64x128,n_outx64`.
+File: `train.py`. Define `WeightBundle {layers:[(W_mo,b)], x_mean,x_scale,y_mean,y_scale,in_names,out_names,y_log_mask}`.
+TF path: seeds; `Sequential` with configurable `hidden_layers` (default `[128,128,64]`) + linear output; optional L2 reg;
+`Adam(lr)` mse; `EarlyStopping(patience=40,restore_best)` + `ReduceLROnPlateau`. Extract `W.T` + `b` per layer.
+Fallback: on any TF import/train exception → sklearn `MLPRegressor(hidden_layer_sizes,relu,adam,alpha=l2,
+n_iter_no_change=patience)`; extract `coefs_.T` + `intercepts_`. Assert no NaN/Inf. Print `epochs_run`/`final_val_loss`.
+**Config defaults:** `epochs=500`, `patience=40`, `l2=0.0`, `hidden_layers=[128,128,64]`, `log_outputs=[]`.
+**Accept:** on tiny synthetic data returns weight matrices per the configured hidden layer sizes.
 
 ### F4. Float/array formatting  `[x]`
 File: `export/formatting.py`. `fmt_float` (high precision, no np artifacts), `fmt_vec` → `{a,b,c}`,
@@ -77,8 +78,9 @@ counts match; `RunSurrogate` uTest len; no NaN/Inf; balanced `()`/`{}`/`[]`; zip
 
 ### F8. Packager + CLI  `[x]`
 Files: `packager.py` (write tree + zip, root = PKG only), `cli.py` (`build <config>` → run F1-F7, write
-`predictions.json` with Python y for `u_test` + K sample rows). `__main__.py` → `cli.main`.
-**Accept:** `python -m surrogategen build datasets/example/config.yaml` → valid ZIP + `predictions.json`; selfcheck runs.
+`predictions.json` with Python y for `u_test` + K sample rows, write `metrics.json` with MAE/RMSE/MAPE/R²
+per output and overall on the held-out test set in original units). `__main__.py` → `cli.main`.
+**Accept:** `python -m surrogategen build datasets/example/config.yaml` → valid ZIP + `predictions.json` + `metrics.json`; selfcheck runs.
 
 ### F9. OpenModelica validation  `[x]`
 File: `scripts/om_validate.py`. OMPython: `loadFile` package.mo; `checkModel` every class; call
@@ -108,3 +110,10 @@ _(append: date — feature id — what changed — status)_
   — DONE.
 - Pending: run the CI `validate` job (OpenModelica `checkModel` + parity) — not runnable locally (no `omc`
   on this machine); verify on first push. Manual Dymola import spot-check still recommended (AC6).
+- 2026-08-18 — F2/F3/F6/F8 — Post-launch enhancements: corrected data split to 80/10/10 (was 70/15/15);
+  `TrainingParams` extended with `l2` (L2 regularisation, default 0), `hidden_layers` (configurable layer
+  widths, default [128,128,64]), `log_outputs` (per-output log1p transform + exp_mask inversion in export);
+  training defaults updated to `epochs=500`, `patience=40`; `ReduceLROnPlateau` callback added to TF path;
+  CLI `build` now also writes `<PKG>.metrics.json` (MAE/RMSE/MAPE/R² per output + overall, original units);
+  selfcheck, templates, and tests updated to cover configurable hidden layers, log mask, and dynamic dims.
+  — DONE.
