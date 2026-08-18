@@ -25,10 +25,13 @@ class PreparedData:
     Y_train: np.ndarray
     Y_val: np.ndarray
     Y_test: np.ndarray
+    X_test_raw: np.ndarray  # test inputs in original units (for the accuracy report)
+    Y_test_raw: np.ndarray  # test outputs in original units (for the accuracy report)
     x_mean: list[float]
     x_scale: list[float]
     y_mean: list[float]
     y_scale: list[float]
+    y_log_mask: list[bool]  # per-output: True if that output was log1p-transformed
     u_test: list[float]  # median of input columns, original units
     sample_inputs: list[list[float]]  # a few raw input rows for parity checks
     input_columns: list[str]
@@ -78,9 +81,26 @@ def prepare(cfg: SurrogateConfig, n_samples: int = 5) -> PreparedData:
     X = df[cfg.inputs].to_numpy(dtype=float)
     Y = df[cfg.outputs].to_numpy(dtype=float)
 
-    # 70/15/15 split via two calls with fixed random_state.
+    # Optional log1p transform on skewed output columns (e.g. switching energy).
+    y_log_mask = [col in set(cfg.training.log_outputs) for col in cfg.outputs]
+    if any(y_log_mask):
+        mask = np.asarray(y_log_mask, dtype=bool)
+        neg_cols = [
+            cfg.outputs[i]
+            for i in range(len(cfg.outputs))
+            if mask[i] and np.any(Y[:, i] < 0.0)
+        ]
+        if neg_cols:
+            raise ValueError(
+                "log_outputs requires non-negative values (log1p domain); "
+                f"negative values found in: {neg_cols}"
+            )
+        Y = Y.copy()
+        Y[:, mask] = np.log1p(Y[:, mask])
+
+    # 80/10/10 split via two calls with fixed random_state.
     X_train, X_tmp, Y_train, Y_tmp = train_test_split(
-        X, Y, test_size=0.30, random_state=RANDOM_STATE
+        X, Y, test_size=0.20, random_state=RANDOM_STATE
     )
     X_val, X_test, Y_val, Y_test = train_test_split(
         X_tmp, Y_tmp, test_size=0.50, random_state=RANDOM_STATE
@@ -101,6 +121,13 @@ def prepare(cfg: SurrogateConfig, n_samples: int = 5) -> PreparedData:
     Y_val_s = y_scaler.transform(Y_val)
     Y_test_s = y_scaler.transform(Y_test)
 
+    # Test set in original units for the accuracy report. Y_test may be in log
+    # space (if log_outputs is set); invert so metrics are in real units.
+    Y_test_raw = Y_test.copy()
+    if any(y_log_mask):
+        mask = np.asarray(y_log_mask, dtype=bool)
+        Y_test_raw[:, mask] = np.expm1(Y_test_raw[:, mask])
+
     u_test = np.median(X, axis=0).tolist()
     # Representative raw input rows (from the test split) for numeric parity checks.
     take = min(n_samples, len(X_test))
@@ -113,10 +140,13 @@ def prepare(cfg: SurrogateConfig, n_samples: int = 5) -> PreparedData:
         Y_train=Y_train_s,
         Y_val=Y_val_s,
         Y_test=Y_test_s,
+        X_test_raw=X_test,
+        Y_test_raw=Y_test_raw,
         x_mean=x_scaler.mean_.tolist(),
         x_scale=x_scaler.scale_.tolist(),
         y_mean=y_scaler.mean_.tolist(),
         y_scale=y_scaler.scale_.tolist(),
+        y_log_mask=y_log_mask,
         u_test=u_test,
         sample_inputs=sample_inputs,
         input_columns=list(cfg.inputs),

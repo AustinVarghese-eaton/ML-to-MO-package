@@ -34,7 +34,9 @@ class TrainingParams(BaseModel):
     batch_size: int = 32
     learning_rate: float = 0.001
     patience: int = 40
+    l2: float = 0.0
     hidden_layers: list[int] = Field(default_factory=lambda: [128, 128, 64])
+    log_outputs: list[str] = Field(default_factory=list)
 
     @field_validator("hidden_layers")
     @classmethod
@@ -43,6 +45,13 @@ class TrainingParams(BaseModel):
             raise ValueError("hidden_layers must have at least one layer.")
         if any(n <= 0 for n in v):
             raise ValueError("All hidden_layers sizes must be positive integers.")
+        return v
+
+    @field_validator("l2")
+    @classmethod
+    def _valid_l2(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("l2 must be >= 0.")
         return v
 
 
@@ -97,6 +106,15 @@ class SurrogateConfig(BaseModel):
             raise ValueError(
                 f"Columns cannot be both input and output: {sorted(overlap)}"
             )
+
+        # log_outputs must reference known output columns.
+        unknown_log = [c for c in self.training.log_outputs if c not in self.outputs]
+        if unknown_log:
+            raise ValueError(
+                f"training.log_outputs references unknown output column(s): {unknown_log}"
+            )
+        if len(set(self.training.log_outputs)) != len(self.training.log_outputs):
+            raise ValueError("Duplicate column names found in 'training.log_outputs'.")
 
         # Connector overrides must reference known columns and be valid identifiers.
         for col in self.connectors.inputs:

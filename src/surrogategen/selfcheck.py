@@ -129,17 +129,20 @@ def run(
     )
     _expect_order(files, f"{pkg}/Examples/package.order", ["RunSurrogate"], errors)
 
-    # 4/5. weight dims and bias lengths.
-    expected_dims = [
-        (128, bundle.n_in),
-        (128, 128),
-        (64, 128),
-        (bundle.n_out, 64),
-    ]
-    for i, ((W, b), (rows, cols)) in enumerate(zip(bundle.layers, expected_dims), start=1):
+    # 4/5. weight dims and bias lengths (derived from the layer chain, so any
+    # hidden-layer configuration is supported).
+    n_layers = len(bundle.layers)
+    for i, (W, b) in enumerate(bundle.layers, start=1):
         W_arr = np.asarray(W)
-        if W_arr.shape != (rows, cols):
-            errors.append(f"W{i} shape {W_arr.shape} != expected {(rows, cols)}.")
+        if W_arr.ndim != 2:
+            errors.append(f"W{i} must be a 2-D matrix, got shape {W_arr.shape}.")
+            continue
+        rows, cols = W_arr.shape
+        expected_cols = bundle.n_in if i == 1 else len(bundle.layers[i - 2][0])
+        if cols != expected_cols:
+            errors.append(f"W{i} cols {cols} != expected {expected_cols}.")
+        if i == n_layers and rows != bundle.n_out:
+            errors.append(f"W{i} rows {rows} != n_out {bundle.n_out}.")
         if len(b) != rows:
             errors.append(f"b{i} length {len(b)} != {rows}.")
 

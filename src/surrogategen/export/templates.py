@@ -18,7 +18,7 @@ from importlib import resources
 from surrogategen.export.formatting import fmt_mat, fmt_vec
 from surrogategen.train import WeightBundle
 
-LAYER_FILES = ["dense", "relu", "identity", "affine_scale", "affine_unscale"]
+LAYER_FILES = ["dense", "relu", "identity", "affine_scale", "affine_unscale", "exp_mask"]
 
 
 def _static_layer(name: str, pkg: str) -> str:
@@ -73,6 +73,11 @@ def _surrogate_mlp(pkg: str, bundle: WeightBundle) -> str:
     lines.append(f"  constant Real x_scale[{n_in}] = {fmt_vec(bundle.x_scale)};")
     lines.append(f"  constant Real y_mean[{n_out}] = {fmt_vec(bundle.y_mean)};")
     lines.append(f"  constant Real y_scale[{n_out}] = {fmt_vec(bundle.y_scale)};")
+    log_mask = bundle.y_log_mask or [False] * n_out
+    use_log = any(log_mask)
+    if use_log:
+        mask_vec = [1.0 if m else 0.0 for m in log_mask]
+        lines.append(f"  constant Real y_log_mask[{n_out}] = {fmt_vec(mask_vec)};")
     for i, (W, b) in enumerate(bundle.layers, start=1):
         rows = len(W)
         cols = len(W[0])
@@ -89,7 +94,13 @@ def _surrogate_mlp(pkg: str, bundle: WeightBundle) -> str:
         lines.append(f"  h{i} := {pkg}.Layers.relu({pkg}.Layers.dense({prev}, W{i}, b{i}));")
         prev = f"h{i}"
     lines.append(f"  y_s := {pkg}.Layers.dense({prev}, W{n_layers}, b{n_layers});")
-    lines.append(f"  y := {pkg}.Layers.affine_unscale(y_s, y_mean, y_scale);")
+    if use_log:
+        lines.append(
+            f"  y := {pkg}.Layers.exp_mask("
+            f"{pkg}.Layers.affine_unscale(y_s, y_mean, y_scale), y_log_mask);"
+        )
+    else:
+        lines.append(f"  y := {pkg}.Layers.affine_unscale(y_s, y_mean, y_scale);")
     lines.append("end SurrogateMLP;")
     return "\n".join(lines) + "\n"
 

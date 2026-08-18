@@ -145,3 +145,67 @@ def test_hidden_layers_zero_rejected(tmp_path):
     )
     with pytest.raises(ValueError):
         config_mod.load(p)
+
+
+def test_l2_default_and_custom(tmp_path):
+    p = _write(
+        tmp_path,
+        """
+        dataset: data.csv
+        package_name: Pkg
+        inputs: [a]
+        outputs: [b]
+        training:
+          l2: 0.0001
+        """,
+    )
+    cfg = config_mod.load(p)
+    assert cfg.training.l2 == 0.0001
+
+
+def test_l2_negative_rejected(tmp_path):
+    p = _write(
+        tmp_path,
+        """
+        dataset: data.csv
+        package_name: Pkg
+        inputs: [a]
+        outputs: [b]
+        training:
+          l2: -1.0
+        """,
+    )
+    with pytest.raises(ValueError):
+        config_mod.load(p)
+
+
+def test_log_outputs_valid(tmp_path):
+    p = _write(
+        tmp_path,
+        """
+        dataset: data.csv
+        package_name: Pkg
+        inputs: [a]
+        outputs: [b, c]
+        training:
+          log_outputs: [c]
+        """,
+    )
+    cfg = config_mod.load(p)
+    assert cfg.training.log_outputs == ["c"]
+
+
+def test_log_outputs_unknown_rejected(tmp_path):
+    p = _write(
+        tmp_path,
+        """
+        dataset: data.csv
+        package_name: Pkg
+        inputs: [a]
+        outputs: [b]
+        training:
+          log_outputs: [zzz]
+        """,
+    )
+    with pytest.raises(ValueError):
+        config_mod.load(p)
